@@ -7,19 +7,30 @@ my $version = 20200326;
 
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 
-# Its just gonealmost ten
+# Its just gonealmost ten 23 x 6
 # twenty quarterhalf past
 # to midday  midnight one
 # two three four five six
-# seven  eight   nine ten
-# eleven twelve    oclock
+# seven  eight  nine  ten 
+# eleven  twelve   oclock 
 
-# Its  just gone  almost 
-# ten twenty quarter half
-# past to midday midnight
-# one two three four five 
-# six  eleven eight  nine 
-# ten seven twelve oclock
+# Its just gone almost 20 x 7 
+# ten  twenty  quarter
+# half past to  midday
+# midnight   one   two 
+# three four five  six
+# seven eight nine ten
+# eleven twelve oclock 
+
+# Its   just   gone 17 x 8
+# almost ten twenty
+# quarter half past
+# to midday one two 
+# midnight four six
+# three  seven nine
+# five eight eleven
+# ten twelve oclock 
+
 
 my ($w1, $w2, $w3, $w4, $w5) = ('','','','','');
 
