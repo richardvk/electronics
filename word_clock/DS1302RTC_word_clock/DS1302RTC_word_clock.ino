@@ -7,6 +7,7 @@
 // Set up the DS1302 clock pins
 
 //https://github.com/FastLED/FastLED/wiki/SPI-Hardware-or-Bit-banging
+// note "Strong" (square) nodemcu can upload at max 230400 (usefull!!)`
 //ThreeWire myWire(2,14,0); // (D4,D5,D3) IO/Data, SCLK/CLK, CE/Reset (Use these for 'Strong' (square) ESP8266 board) bitbanged
 ThreeWire myWire(14,12,13); // (D5,D6,D7) IO/Data, SCLK/CLK, CE/Reset (Use these for 'Strong' (square) ESP8266 board) SPI!
 
@@ -86,9 +87,14 @@ int ten[]      = {56,57,58};
 int eleven[]   = {114,115,116,117,118,119};
 int twelve[]   = {59,60,61,62,63,120};
 int oclock[]   = {122,123,124,125,126,127};
+int error[]    = {21,22}; // used to show 'ER' if there is an error
 
 int pixel_num, num_pixels;
 int random_r, random_g, random_b, random_x, random_y;
+
+// some variables to help track our 'millis' counter so we dont have to use 'delay()'
+int display_refresh_period = 60000;
+unsigned long millis_counter = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -96,83 +102,45 @@ void setup ()
 {
     Serial.begin(19200);
 
-    // Setup for the clock, try get the time off the chip
-    Serial.print("compiled: "); 
-    Serial.print(__DATE__);
-    Serial.println(__TIME__);
+    // Set up the clock
+    set_up_ds1302();
 
-    Rtc.Begin();
-
-    RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
-    printDateTime(compiled);
-    Serial.println();
-
-    if (!Rtc.IsDateTimeValid()) 
-    {
-        // Common Causes:
-        //    1) first time you ran and the device wasn't running yet
-        //    2) the battery on the device is low or even missing
-
-        Serial.println("RTC lost confidence in the DateTime!");
-        Rtc.SetDateTime(compiled);
-    }
-
-    if (Rtc.GetIsWriteProtected())
-    {
-        Serial.println("RTC was write protected, enabling writing now");
-        Rtc.SetIsWriteProtected(false);
-    }
-
-    if (!Rtc.GetIsRunning())
-    {
-        Serial.println("RTC was not actively running, starting now");
-        Rtc.SetIsRunning(true);
-    }
-
-    RtcDateTime now = Rtc.GetDateTime();
-    if (now < compiled) 
-    {
-        Serial.println("RTC is older than compile time!  (Updating DateTime)");
-        Rtc.SetDateTime(compiled);
-    }
-    else if (now > compiled) 
-    {
-        Serial.println("RTC is newer than compile time. (this is expected)");
-    }
-    else if (now == compiled) 
-    {
-        Serial.println("RTC is the same as compile time! (fine assuming the board was just flashed!)");
-    }
-
-    // Set up for the LEDs
+    // Set up the LEDs
     FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
     FastLED.setBrightness(40);
-
-    FastLED.clear();
-    FastLED.show();
-    delay(1); // this seems to be helpful/needed to get the clear/show to actually take effect - might want to move this _before_ the clock setup
-    
- }
+}
 
 void loop () 
 {
-    // Clear the LEDs
-    FastLED.clear(true);
-    for (int i=0; i<128; i++)
-        leds(i) = CRGB::Black;
-    FastLED.show();
-    delay(100);
 
-  
+  // do other stuff here, like checking button presses
+
+  if(millis() >= millis_counter + display_refresh_period){
+
+    // Get the current time off the RTC
     RtcDateTime now = Rtc.GetDateTime();
+
+    // This sneakiness allows our 'delay' to fall almost perfectly on the '00' second, as the minute rolls over.
+    // Really its trying to account for any drift that happens if we do a refresh on 60sec + time_it_takes_to_do_all_the_display_work
+    int sc = now.Second();
+    millis_counter = millis_counter + display_refresh_period - (sc) * 1000);
 
     if (!now.IsValid())
     {
-        // Common Causes:
-        //    1) the battery on the device is low or even missing and the power line was disconnected
-        Serial.println("RTC lost confidence in the DateTime!");
+        // the battery on the device is low or even missing or the power line is disconnected
+        Serial.println("Cannot retrieve a valid time from RTC!");
+        show_error();
+        return;
     }
 
+    display_word_clock(now);
+  } // end millis check for clock display refresh
+}
+
+void display_word_clock(RtcDateTime now) {
+
+    // Clear the LEDs
+    FastLED.clear(true);
     
     int hr = now.Hour();
     int mn = now.Minute();
@@ -181,7 +149,7 @@ void loop ()
     String min_str = mn < 10 ? "0"+mn : ""+mn;
     String hr_str  = hr < 10 ? "0"+hr : ""+hr;
 
-    FastLED.clear(false);
+    // fill the colour array with our predetermined colours but each time in a different colour order
     SetCRGBColours();
 
     int colourIndex=0;
@@ -353,9 +321,6 @@ void loop ()
         leds(oclock[i]) = random_colour;
     }
 
-    Serial.print("Final colour index: ");
-    Serial.println(colourIndex);
-
     String sentence = "It's " + w1 + w2 + w3 + w4 + w5;
     
     printDateTime(now);
@@ -363,9 +328,8 @@ void loop ()
     Serial.println(sentence);
 
     FastLED.show();
-    delay(60000);
     
-}
+} // end display_word_clock
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 
@@ -385,7 +349,6 @@ void printDateTime(const RtcDateTime& dt)
 
 CRGB get_random_colour() 
 {
-  // not currently used
   CRGB random_colour;
   random_colour = CRGBColours[random(NUM_COLOURS)];
   return random_colour;
@@ -402,23 +365,11 @@ void SetCRGBColours()
 
     bool Filled = false;
 
-    // keep looking for an index that we havent filled yet
-    //Serial.println();
-    //Serial.print("Trying to fill position ");
-    //Serial.println(fillIndex);
-
     // The first one we can always just fill with whatever, there is nothing to clash with yet
+
     if (fillIndex == 0) {
       //select a random index
       int RandomIndex = random(NUM_COLOURS);
-      //Serial.print(" - Selected RandomIndex: ");
-      //Serial.println(RandomIndex);
-
-      //Serial.print("  - Setting FIRST index pos [");
-      //Serial.print(fillIndex);
-      //Serial.print("] to ");
-      //Serial.print(RandomIndex);
-      //Serial.println(" WITHOUT CHECKING");
         
       SelectedColourIndexes[fillIndex] = RandomIndex;
       fillIndex++;
@@ -431,42 +382,21 @@ void SetCRGBColours()
       
       //select a random index
       int RandomIndex = random(NUM_COLOURS);
-      //Serial.print(" - Selected RandomIndex: ");
-      //Serial.println(RandomIndex);
       
       // Run through the array of colours we have filled so far and make sure we havent already picked this one
-      // If we have, loop again
+      // If we have, loop again...
+
       for (int i=0; i<fillIndex; i++) {
-
-        //Serial.print(" - RandomIndex ");
-        //Serial.print(RandomIndex);
-            
         if (RandomIndex == SelectedColourIndexes[i]) {
-
-          //Serial.print(" - RandomIndex ");
-          //Serial.print(RandomIndex);
-          //Serial.println(" was already added, try another random index (setting Found to true)...");
-            
           Found = true; // its in the array already, we cant use it, so we need to go through the 'while' one more time...
           break;
         } // end if
-        else {
-          //Serial.print(" not equal to index [");
-          //Serial.print(i);
-          //Serial.print("] with value: ");
-          //Serial.println(SelectedColourIndexes[i]);
-        }
            
       } // end for
 
       // We have gone through all the currently filled indexes.
       // If Found is still false it means the RandomIndex we chose _is_ available - we should add this value to this index of SelectedColourIndexes
       if (!Found) {
-        //Serial.print("  - Setting index pos [");
-        //Serial.print(fillIndex);
-        //Serial.print("] to ");
-        //Serial.println(RandomIndex);
-          
         SelectedColourIndexes[fillIndex] = RandomIndex;
         fillIndex++;
         Filled = true;
@@ -474,22 +404,72 @@ void SetCRGBColours()
         
     } // end while (!Filled)
 
-    //Serial.println("  - Resetting Filled to false...");
     Filled = false; // reset for the next round
-
-    //delay(15000);
       
   } // end while (fillIndex<NUM_COLOURS) 
 
-  /*Serial.println("Ended up with:");
-  for (int i=0; i<NUM_COLOURS; i++) {
-
-    Serial.print("[");
-    Serial.print(i);
-    Serial.print("] - ");
-    Serial.print(SelectedColourIndexes[i]);
-    Serial.println();
-  }
-  */
-  //delay(10000);
 } // end SetCRGBColours
+
+void set_up_ds1302() {
+
+    // Setup for the clock, try get the time off the chip
+    Serial.print("compiled: "); 
+    Serial.print(__DATE__);
+    Serial.println(__TIME__);
+
+    Rtc.Begin();
+
+    RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
+    printDateTime(compiled);
+    Serial.println();
+
+    if (!Rtc.IsDateTimeValid())
+    {
+        // Common Causes:
+        //    1) first time you ran and the device wasn't running yet
+        //    2) the battery on the device is low or even missing
+
+        Serial.println("RTC lost confidence in the DateTime!");
+        Rtc.SetDateTime(compiled);
+    }
+
+    if (Rtc.GetIsWriteProtected())
+    {
+        Serial.println("RTC was write protected, enabling writing now");
+        Rtc.SetIsWriteProtected(false);
+    }
+
+    if (!Rtc.GetIsRunning())
+    {
+        Serial.println("RTC was not actively running, starting now");
+        Rtc.SetIsRunning(true);
+    }
+
+    RtcDateTime now = Rtc.GetDateTime();
+    if (now < compiled)
+    {
+        Serial.println("RTC is older than compile time!  (Updating DateTime)");
+        Rtc.SetDateTime(compiled);
+    }
+    else if (now > compiled)
+    {
+        Serial.println("RTC is newer than compile time. (this is expected)");
+    }
+    else if (now == compiled)
+    {
+        Serial.println("RTC is the same as compile time! (fine assuming the board was just flashed!)");
+    }
+
+} // end set_up_ds1302
+
+void show_error() {
+
+  CRGB colour = CRGB::Red;
+
+  for (int i=0; i<2; i++)
+    leds(error[i]) = colour;
+  delay(500);
+  FastLED.show();
+  delay(1000);
+
+}
