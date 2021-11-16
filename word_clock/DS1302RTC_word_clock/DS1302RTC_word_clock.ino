@@ -31,6 +31,8 @@ RtcDS1302<ThreeWire> Rtc(myWire);
 #define BOARD_WIDTH   8 // boards are square so 'width' is both x width and y width
 #define NUM_BOARDS    2
 #define NUM_COLOURS   6
+#define NORMAL_BRIGHTNESS 40
+#define MAX_BRIGHTNESS    70
 
 // Set up the matrix
 cLEDMatrix<BOARD_WIDTH*NUM_BOARDS, BOARD_WIDTH, MATRIX_TYPE> leds;
@@ -39,12 +41,14 @@ cLEDMatrix<BOARD_WIDTH*NUM_BOARDS, BOARD_WIDTH, MATRIX_TYPE> leds;
 static const CRGB CRGBColours [NUM_COLOURS] =
 {
   CRGB::Yellow,
-  CRGB::Blue,
+  CRGB::Cyan,
   CRGB::Red,
   CRGB::Green,
   CRGB::Orange,
   CRGB::White
 };
+
+int fixed_colour = 6;
 
 static int SelectedColourIndexes [NUM_COLOURS] = {99,99,99,99,99,99};
 
@@ -89,12 +93,35 @@ int twelve[]   = {59,60,61,62,63,120};
 int oclock[]   = {122,123,124,125,126,127};
 int error[]    = {21,22}; // used to show 'ER' if there is an error
 
+int digit_one[]   = {9,10,18,26,34,41,42,43};                // 8 digits
+int digit_two[]   = {9,10,11,19,25,26,27,33,41,42,43};       // 11 digits
+int digit_three[] = {9,10,11,19,25,26,27,35,41,42,43};       // 11 digits
+int digit_four[]  = {9,11,17,19,25,26,27,35,43};             // 9 digits
+int digit_five[]  = {9,10,11,17,25,26,27,35,41,42,43};       // 11 digits
+int digit_six[]   = {9,10,11,17,25,26,27,33,35,41,42,43};    // 12 digits
+int digit_seven[] = {9,10,11,19,27,35,43};                   // 7 digits
+int digit_eight[] = {9,10,11,17,19,25,26,27,33,35,41,42,43}; // 13 digits
+int digit_nine[]  = {9,10,11,17,19,25,26,27,35,41,42,43};    // 12 digits
+int digit_zero[]  = {9,10,11,17,19,25,27,33,35,41,42,43};    // 12 digits
+int digit_colon[] = {80,96};                                 // 2 digits
+
 int pixel_num, num_pixels;
 int random_r, random_g, random_b, random_x, random_y;
 
 // some variables to help track our 'millis' counter so we dont have to use 'delay()'
 int display_refresh_period = 60000;
 unsigned long millis_counter = 0;
+
+// Buttons
+const int minUpPin = 5; // D1
+const int minDownPin = 4; // D2
+int minUpPinState = 0;
+int minDownPinState = 0;
+unsigned long minUp_millis_counter = 0;
+unsigned long minDown_millis_counter = 0;
+int button_delay_period = 500;
+
+int temp_cnt = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -107,15 +134,49 @@ void setup ()
 
     // Set up the LEDs
     FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
-    FastLED.setBrightness(40);
+    FastLED.setBrightness(NORMAL_BRIGHTNESS);
+
+    // Sert up buttons
+    pinMode(minUpPin,   INPUT);
+    pinMode(minDownPin, INPUT);
 }
 
 void loop () 
 {
 
   // do other stuff here, like checking button presses
+  // read the state of the pushbutton value:
+  minUpPinState   = digitalRead(minUpPin);
+  minDownPinState = digitalRead(minDownPin);
 
-  if(millis() >= millis_counter + display_refresh_period){
+  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
+  if (minUpPinState == LOW && millis() >= minUp_millis_counter) {
+    RtcDateTime now = Rtc.GetDateTime();
+    now += 60; // add a minute
+    Rtc.SetDateTime(now);
+
+    FastLED.setBrightness(MAX_BRIGHTNESS);
+    display_digital_clock(now);
+    FastLED.setBrightness(NORMAL_BRIGHTNESS);
+
+    minUp_millis_counter = millis() + button_delay_period;
+    millis_counter = millis()-display_refresh_period+2000;
+  }
+
+  if (minDownPinState == LOW && millis() >= minDown_millis_counter) {
+    RtcDateTime now = Rtc.GetDateTime();
+    now -= 60; // subtract a minute
+    Rtc.SetDateTime(now);
+
+    FastLED.setBrightness(MAX_BRIGHTNESS);
+    display_digital_clock(now);
+    FastLED.setBrightness(NORMAL_BRIGHTNESS);
+
+    minDown_millis_counter = millis() + button_delay_period;
+    millis_counter = millis()-display_refresh_period+2000;
+  }
+
+  if(millis_counter == 0 || millis() >= millis_counter + display_refresh_period){
 
     // Get the current time off the RTC
     RtcDateTime now = Rtc.GetDateTime();
@@ -123,7 +184,7 @@ void loop ()
     // This sneakiness allows our 'delay' to fall almost perfectly on the '00' second, as the minute rolls over.
     // Really its trying to account for any drift that happens if we do a refresh on 60sec + time_it_takes_to_do_all_the_display_work
     int sc = now.Second();
-    millis_counter = millis_counter + display_refresh_period - (sc) * 1000);
+    millis_counter = millis_counter + display_refresh_period - ((sc-1) * 1000);
 
     if (!now.IsValid())
     {
@@ -136,6 +197,108 @@ void loop ()
     display_word_clock(now);
   } // end millis check for clock display refresh
 }
+
+void display_digital_clock(RtcDateTime now){
+  
+  // work out what digits to show
+  int hr = now.Hour();
+  int mn = now.Minute();
+
+  FastLED.clearData();
+  delay(10);
+  FastLED.clear(false);
+  delay(10);
+
+  if (hr >= 10) {
+    display_digit(1,0);
+    display_digit(hr-10,1);
+  }
+  else {
+    display_digit(0,0);
+    display_digit(hr,1);
+  }
+
+  //display_colon();
+
+  if (mn >= 10) {
+    display_digit(mn/10,2);
+    display_digit(mn%10,3);
+  }
+  else {
+    display_digit(0,2);
+    display_digit(mn%10,3);
+  }
+
+  delay(10);
+  FastLED.show();
+  delay(10);
+}
+
+void display_digit(int digit, int offset){
+
+  CRGB colour = CRGB::White;
+
+  int led_offset = 0; // the number we must add to the led number to shift the lit led across to the right
+  if (offset == 1){
+    led_offset = 4;
+  }
+  else if (offset == 2){
+    led_offset = 64;
+  }
+  else if (offset == 3){
+    led_offset = 68;
+  }
+
+  if (digit == 0) {
+    for (int a=0; a<12; a++)
+        leds(digit_zero[a]+led_offset) = colour;
+  }
+  else if (digit == 1) {
+    for (int a=0; a<8; a++)
+        leds(digit_one[a]+led_offset) = colour;
+  }
+  else if (digit == 2) {
+    for (int a=0; a<11; a++)
+        leds(digit_two[a]+led_offset) = colour;
+  }
+  else if (digit == 3) {
+    for (int a=0; a<11; a++)
+        leds(digit_three[a]+led_offset) = colour;
+  }
+  else if (digit == 4) {
+    for (int a=0; a<9; a++)
+        leds(digit_four[a]+led_offset) = colour;
+  }
+  else if (digit == 5) {
+    for (int a=0; a<11; a++)
+        leds(digit_five[a]+led_offset) = colour;
+  }
+  else if (digit == 6) {
+    for (int a=0; a<12; a++)
+        leds(digit_six[a]+led_offset) = colour;
+  }
+  else if (digit == 7) {
+    for (int a=0; a<7; a++)
+        leds(digit_seven[a]+led_offset) = colour;
+  }
+  else if (digit == 8) {
+    for (int a=0; a<13; a++)
+        leds(digit_eight[a]+led_offset) = colour;
+  }
+  else if (digit == 9) {
+    for (int a=0; a<12; a++)
+        leds(digit_nine[a]+led_offset) = colour;
+  }
+
+} // end display_digit
+
+void display_colon(){
+
+  CRGB colour = CRGB::White;
+
+  for (int a=0; a<2; a++)
+        leds(digit_colon[a]) = colour;
+} // end display_colon
 
 void display_word_clock(RtcDateTime now) {
 
@@ -155,6 +318,7 @@ void display_word_clock(RtcDateTime now) {
     int colourIndex=0;
 
     // Word zero (always "It's")
+
     CRGB random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
     for (int a=0; a<3; a++){
         leds(its[a]) = random_colour;
@@ -164,51 +328,56 @@ void display_word_clock(RtcDateTime now) {
     // Word one
     if ((mn>=1 && mn<=5) || (mn>=11 && mn<=12) || (mn>=16 && mn<=17) || (mn>=21 && mn<=25) || (mn>=31 && mn<=35) || (mn>=41 && mn<=42) || (mn>=46 && mn<=47) || (mn>=51 && mn<=54)){
       w1 = "just gone ";
+
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
       colourIndex++;
       for (int i=0; i<4; i++)
         leds(just[i]) = random_colour;
 
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
-      colourIndex++;
       for (int j=0; j<4; j++)
         leds(gone[j]) = random_colour;  
+      colourIndex++;
     }
     else if ((mn>=6 && mn<=9) || (mn>=11 && mn<=14) || (mn>=18 && mn<=19) || (mn>=26 && mn<=29)  || (mn>=36 && mn<=39) || (mn>=43 && mn<=44) || (mn>=48 && mn<=49) || (mn>=55 && mn<=59)){
       w1 = "almost ";
 
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
-      colourIndex++;
       for (int i=0; i<6; i++)
         leds(almost[i]) = random_colour;
+      colourIndex++;
     }
 
     // Word two
+    // this 'word' is not always shown, so only increase the colour index if it is shown
     if ((mn>=13 && mn<=17) || (mn>=43 && mn<=47)){
       w2 = "quarter ";
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
       for (int i=0; i<7; i++)
         leds(quarter[i]) = random_colour;
+      colourIndex++;
     }
     else if (mn>=26 && mn<=35){
       w2 = "half ";
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
       for (int i=0; i<4; i++)
         leds(half[i]) = random_colour;
+      colourIndex++;
     }
     else if ((mn>=6 && mn<=12) || (mn>=48 && mn<=54)){
       w2 = "ten ";
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
       for (int i=0; i<3; i++)
         leds(ten1[i]) = random_colour;
+      colourIndex++;
     }
     else if ((mn>=18 && mn<=25) || (mn>=36 && mn<=42)){
       w2 = "twenty ";
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
       for (int i=0; i<6; i++)
         leds(twenty[i]) = random_colour;
+      colourIndex++;
     }
-    colourIndex++;
 
     // Word three
     if ((mn>=6 && mn<=35)) {
@@ -216,14 +385,15 @@ void display_word_clock(RtcDateTime now) {
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
       for (int i=0; i<4; i++)
         leds(past[i]) = random_colour;
+      colourIndex++;
     }
     else if ((mn>=36 && mn<=54)) {
       w3 = "to ";
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
       for (int i=0; i<2; i++)
         leds(to[i]) = random_colour;
+      colourIndex++;
     }
-    colourIndex++;
 
     // Word for the hour
     int word_hr = hr;
@@ -237,6 +407,7 @@ void display_word_clock(RtcDateTime now) {
     // Word four
     if (word_hr == 0 && (mn>=55 || mn<=5)) {
       w4 = "midnight ";
+
       random_colour = CRGBColours[SelectedColourIndexes[colourIndex]];
       for (int i=0; i<8; i++)
         leds(midnight[i]) = random_colour;
@@ -356,10 +527,21 @@ CRGB get_random_colour()
 
 void SetCRGBColours() 
 {
-  //Serial.println("Setting random colour order");
+
+  if (fixed_colour > 0){
+    for (int i=0; i<NUM_COLOURS; i++) {
+      SelectedColourIndexes[i] = fixed_colour-1;
+    }
+
+    fixed_colour++;
+    if (fixed_colour>6)
+      fixed_colour=1;
+
+    return;
+
+  }
 
   int fillIndex = 0;
-  //SelectedColourIndexes = {99,99,99,99,99,99};
 
   while (fillIndex<NUM_COLOURS) { // we still have unfilled colour slots
 
@@ -387,6 +569,7 @@ void SetCRGBColours()
       // If we have, loop again...
 
       for (int i=0; i<fillIndex; i++) {
+
         if (RandomIndex == SelectedColourIndexes[i]) {
           Found = true; // its in the array already, we cant use it, so we need to go through the 'while' one more time...
           break;
