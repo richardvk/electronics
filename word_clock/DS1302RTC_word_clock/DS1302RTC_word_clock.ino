@@ -42,13 +42,13 @@ static const CRGB CRGBColours [NUM_COLOURS] =
 {
   CRGB::Yellow,
   CRGB::Cyan,
-  CRGB::Red,
-  CRGB::Green,
+  CRGB::IndianRed,
+  CRGB::LawnGreen,
   CRGB::Orange,
   CRGB::White
 };
 
-int fixed_colour = 6;
+int fixed_colour = 0; // the idea here is that in future we can change this with a button press and choose the colour we want on the display
 
 static int SelectedColourIndexes [NUM_COLOURS] = {99,99,99,99,99,99};
 
@@ -136,7 +136,7 @@ void setup ()
     FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
     FastLED.setBrightness(NORMAL_BRIGHTNESS);
 
-    // Sert up buttons
+    // Set up buttons
     pinMode(minUpPin,   INPUT);
     pinMode(minDownPin, INPUT);
 }
@@ -155,9 +155,9 @@ void loop ()
     now += 60; // add a minute
     Rtc.SetDateTime(now);
 
-    FastLED.setBrightness(MAX_BRIGHTNESS);
+    //FastLED.setBrightness(MAX_BRIGHTNESS);
     display_digital_clock(now);
-    FastLED.setBrightness(NORMAL_BRIGHTNESS);
+    //FastLED.setBrightness(NORMAL_BRIGHTNESS);
 
     minUp_millis_counter = millis() + button_delay_period;
     millis_counter = millis()-display_refresh_period+2000;
@@ -168,9 +168,9 @@ void loop ()
     now -= 60; // subtract a minute
     Rtc.SetDateTime(now);
 
-    FastLED.setBrightness(MAX_BRIGHTNESS);
+    //FastLED.setBrightness(MAX_BRIGHTNESS);
     display_digital_clock(now);
-    FastLED.setBrightness(NORMAL_BRIGHTNESS);
+    //FastLED.setBrightness(NORMAL_BRIGHTNESS);
 
     minDown_millis_counter = millis() + button_delay_period;
     millis_counter = millis()-display_refresh_period+2000;
