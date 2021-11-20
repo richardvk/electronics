@@ -205,10 +205,7 @@ void display_digital_clock(RtcDateTime now){
   int hr = now.Hour();
   int mn = now.Minute();
 
-  FastLED.clearData();
-  delay(10);
   FastLED.clear(false);
-  delay(10);
 
   if (hr >= 10) {
     display_digit(1,0);
@@ -230,10 +227,10 @@ void display_digital_clock(RtcDateTime now){
     display_digit(mn%10,3);
   }
 
-  delay(10);
   FastLED.show();
-  delay(10);
-}
+
+} // end display_digital_clock
+
 
 void display_digit(int digit, int offset){
 
