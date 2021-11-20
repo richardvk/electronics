@@ -182,12 +182,11 @@ void loop ()
     RtcDateTime now = Rtc.GetDateTime();
 
     // This sneakiness allows our 'delay' to fall almost perfectly on the '00' second, as the minute rolls over.
-    // Really its trying to account for any drift that happens if we do a refresh on 60sec + time_it_takes_to_do_all_the_display_work
+    // Really, its trying to account for any drift that happens if we do a refresh on 60sec + time_it_takes_to_do_all_the_display_work
     int sc = now.Second();
     millis_counter = millis_counter + display_refresh_period - ((sc-1) * 1000);
 
-    if (!now.IsValid())
-    {
+    if ( !now.IsValid() ){
         // the battery on the device is low or even missing or the power line is disconnected
         Serial.println("Cannot retrieve a valid time from RTC!");
         show_error();
@@ -195,8 +194,10 @@ void loop ()
     }
 
     display_word_clock(now);
+
   } // end millis check for clock display refresh
-}
+
+} // end loop
 
 void display_digital_clock(RtcDateTime now){
   
