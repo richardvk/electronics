@@ -208,15 +208,15 @@ void display_digital_clock(RtcDateTime now){
   FastLED.clear(false);
 
   if (hr >= 10) {
-    display_digit(1,0);
-    display_digit(hr-10,1);
+    display_digit(hr/10,0);
+    display_digit(hr%10,1);
   }
   else {
     display_digit(0,0);
     display_digit(hr,1);
   }
 
-  //display_colon();
+  //display_colon(); // this makes the readability worse, so just leave it out
 
   if (mn >= 10) {
     display_digit(mn/10,2);
@@ -224,7 +224,7 @@ void display_digital_clock(RtcDateTime now){
   }
   else {
     display_digit(0,2);
-    display_digit(mn%10,3);
+    display_digit(mn,3);
   }
 
   FastLED.show();
