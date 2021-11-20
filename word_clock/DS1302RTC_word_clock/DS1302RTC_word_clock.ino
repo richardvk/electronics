@@ -296,7 +296,9 @@ void display_colon(){
 
   for (int a=0; a<2; a++)
         leds(digit_colon[a]) = colour;
+
 } // end display_colon
+
 
 void display_word_clock(RtcDateTime now) {
 
