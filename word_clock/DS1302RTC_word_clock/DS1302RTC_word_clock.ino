@@ -50,7 +50,7 @@ static const CRGB CRGBColours [NUM_COLOURS] =
 
 int fixed_colour = 0; // the idea here is that in future we can change this with a button press and choose the colour we want on the display
 
-static int SelectedColourIndexes [NUM_COLOURS] = {99,99,99,99,99,99};
+static int SelectedColourIndexes [NUM_COLOURS];
 
 // Some static data for the word clock
 String hour_str[]={"twelve","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve"};
@@ -502,21 +502,8 @@ void display_word_clock(RtcDateTime now) {
     
 } // end display_word_clock
 
+// IS THIS NEEDED??
 #define countof(a) (sizeof(a) / sizeof(a[0]))
-
-void printDateTime(const RtcDateTime& dt)
-{
-    char datestring[20];
-
-    snprintf_P(datestring, 
-            countof(datestring),
-            //PSTR("%02u/%02u/%04u %02u:%02u:%02u"),
-            PSTR("%02u:%02u:%02u"),
-            dt.Hour(),
-            dt.Minute(),
-            dt.Second() );
-    Serial.print(datestring);
-}
 
 CRGB get_random_colour() 
 {
@@ -598,6 +585,7 @@ void set_up_ds1302() {
     // Setup for the clock, try get the time off the chip
     Serial.print("compiled: "); 
     Serial.print(__DATE__);
+    Serial.print(" ");
     Serial.println(__TIME__);
 
     Rtc.Begin();
@@ -637,13 +625,31 @@ void set_up_ds1302() {
     else if (now > compiled)
     {
         Serial.println("RTC is newer than compile time. (this is expected)");
+        Rtc.SetDateTime(compiled);
     }
     else if (now == compiled)
     {
-        Serial.println("RTC is the same as compile time! (fine assuming the board was just flashed!)");
+        Serial.println("RTC is the same as compile time! (fine, assuming the board was just flashed!)");
     }
 
 } // end set_up_ds1302
+
+void printDateTime(const RtcDateTime& dt)
+{
+    char datestring[20];
+
+    snprintf_P(datestring,
+            countof(datestring),
+            PSTR("%04u-%02u-%02u %02u:%02u:%02u"),
+            //PSTR("%02u:%02u:%02u"),
+            dt.Year(),
+            dt.Month(),
+            dt.Day(),
+            dt.Hour(),
+            dt.Minute(),
+            dt.Second() );
+    Serial.print(datestring);
+}
 
 void show_error() {
 
