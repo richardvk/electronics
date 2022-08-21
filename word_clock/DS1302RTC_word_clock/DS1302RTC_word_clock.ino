@@ -581,18 +581,17 @@ void SetCRGBColours()
 void set_up_ds1302() {
 
     // Setup for the clock, try get the time off the chip
-    Serial.print("compiled: "); 
-    Serial.print(__DATE__);
-    Serial.println(__TIME__);
+    Serial.println();
+    Serial.println();
 
     Rtc.Begin();
 
     RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
+    Serial.print("Compiled: ");
     printDateTime(compiled);
     Serial.println();
 
-    if (!Rtc.IsDateTimeValid())
-    {
+    if (!Rtc.IsDateTimeValid()) {
         // Common Causes:
         //    1) first time you ran and the device wasn't running yet
         //    2) the battery on the device is low or even missing
@@ -601,31 +600,46 @@ void set_up_ds1302() {
         Rtc.SetDateTime(compiled);
     }
 
-    if (Rtc.GetIsWriteProtected())
-    {
+    if (Rtc.GetIsWriteProtected()) {
         Serial.println("RTC was write protected, enabling writing now");
         Rtc.SetIsWriteProtected(false);
     }
 
-    if (!Rtc.GetIsRunning())
-    {
+    if (!Rtc.GetIsRunning()) {
         Serial.println("RTC was not actively running, starting now");
         Rtc.SetIsRunning(true);
     }
 
+    // get the time off the RTC so we can compare to the 'compiled' time
     RtcDateTime now = Rtc.GetDateTime();
-    if (now < compiled)
-    {
-        Serial.println("RTC is older than compile time!  (Updating DateTime)");
-        Rtc.SetDateTime(compiled);
+
+    Serial.print("RTC time: ");
+    printDateTime(now);
+    Serial.println();
+
+    // Get the NTP time
+    timeClient.update();
+    Serial.println(timeClient.getFormattedTime());
+    unsigned long thirty_years_secs = 946684800;
+    int timezone_offset_hours = 10;
+    int timezone_offset_secs = timezone_offset_hours * 60 * 60;
+    unsigned long epoch_ntp = timeClient.getEpochTime() - thirty_years_secs + timezone_offset_secs;
+    Serial.print("Epoch: ");
+    Serial.println(epoch_ntp);
+    RtcDateTime ntprtc = RtcDateTime(epoch_ntp);
+    Serial.print("NTPRTC: ");
+    printDateTime(ntprtc);
+    Serial.println();
+
+    if (now < ntprtc) {
+        Serial.println("RTC is older than NTP time!  (Updating DateTime)");
+        Rtc.SetDateTime(ntprtc);
     }
-    else if (now > compiled)
-    {
-        Serial.println("RTC is newer than compile time. (this is expected)");
+    else if (now > ntprtc) {
+        Serial.println("RTC is newer than NTP time. (this is expected)");
     }
-    else if (now == compiled)
-    {
-        Serial.println("RTC is the same as compile time! (fine assuming the board was just flashed!)");
+    else if (now == ntprtc) {
+        Serial.println("RTC is the same as NTP time! (fine assuming the board was just flashed!)");
     }
 
 } // end set_up_ds1302
