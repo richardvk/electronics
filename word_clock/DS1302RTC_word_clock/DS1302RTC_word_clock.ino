@@ -123,13 +123,6 @@ int display_refresh_period = 60000;
 unsigned long millis_counter = 0;
 
 // Buttons
-const int minUpPin = 5; // D1
-const int minDownPin = 4; // D2
-int minUpPinState = 0;
-int minDownPinState = 0;
-unsigned long minUp_millis_counter = 0;
-unsigned long minDown_millis_counter = 0;
-int button_delay_period = 500;
 
 int temp_cnt = 0;
 
@@ -139,52 +132,32 @@ void setup ()
 {
     Serial.begin(19200);
 
+    // Connect to wifi
+    WiFi.begin(ssid, password);
+
+    Serial.println( "Connecting to wifi..." );
+
+    while ( WiFi.status() != WL_CONNECTED ) {
+      delay ( 500 );
+      Serial.print( "." );
+    }
+
+    Serial.println("");
+    Serial.println("Connected to Wifi!");
+
+    // Start NTP Client
+    timeClient.begin();
+
     // Set up the clock
     set_up_ds1302();
 
     // Set up the LEDs
     FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
     FastLED.setBrightness(NORMAL_BRIGHTNESS);
-
-    // Sert up buttons
-    pinMode(minUpPin,   INPUT);
-    pinMode(minDownPin, INPUT);
 }
 
 void loop () 
 {
-
-  // do other stuff here, like checking button presses
-  // read the state of the pushbutton value:
-  minUpPinState   = digitalRead(minUpPin);
-  minDownPinState = digitalRead(minDownPin);
-
-  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
-  if (minUpPinState == LOW && millis() >= minUp_millis_counter) {
-    RtcDateTime now = Rtc.GetDateTime();
-    now += 60; // add a minute
-    Rtc.SetDateTime(now);
-
-    FastLED.setBrightness(MAX_BRIGHTNESS);
-    display_digital_clock(now);
-    FastLED.setBrightness(NORMAL_BRIGHTNESS);
-
-    minUp_millis_counter = millis() + button_delay_period;
-    millis_counter = millis()-display_refresh_period+2000;
-  }
-
-  if (minDownPinState == LOW && millis() >= minDown_millis_counter) {
-    RtcDateTime now = Rtc.GetDateTime();
-    now -= 60; // subtract a minute
-    Rtc.SetDateTime(now);
-
-    FastLED.setBrightness(MAX_BRIGHTNESS);
-    display_digital_clock(now);
-    FastLED.setBrightness(NORMAL_BRIGHTNESS);
-
-    minDown_millis_counter = millis() + button_delay_period;
-    millis_counter = millis()-display_refresh_period+2000;
-  }
 
   if(millis_counter == 0 || millis() >= millis_counter + display_refresh_period){
 
@@ -520,8 +493,10 @@ void printDateTime(const RtcDateTime& dt)
 
     snprintf_P(datestring, 
             countof(datestring),
-            //PSTR("%02u/%02u/%04u %02u:%02u:%02u"),
-            PSTR("%02u:%02u:%02u"),
+            PSTR("%02u/%02u/%04u %02u:%02u:%02u"),
+            dt.Day(),
+            dt.Month(),
+            dt.Year(),
             dt.Hour(),
             dt.Minute(),
             dt.Second() );
