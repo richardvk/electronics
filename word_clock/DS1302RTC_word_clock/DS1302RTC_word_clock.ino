@@ -3,6 +3,16 @@
 #define FASTLED_INTERNAL // (thanks to https://www.reddit.com/r/FastLED/comments/kn5vjn/pragma_message_fastled_version_3004000/)
 #include <FastLED.h>
 #include <LEDMatrix.h>
+#include <NTPClient.h>
+#include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
+
+// WiFi credentials
+const char *ssid     = "SSID";
+const char *password = "ssid_password";
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
+
 
 // Set up the DS1302 clock pins
 
